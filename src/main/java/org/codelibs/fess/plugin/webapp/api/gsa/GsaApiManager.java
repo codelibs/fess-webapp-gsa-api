@@ -63,16 +63,28 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+/**
+ * GSA (Google Search Appliance) compatible API manager that handles search requests
+ * and generates XML responses in GSA format. This allows existing GSA clients to
+ * seamlessly integrate with Fess search engine.
+ */
 public class GsaApiManager extends BaseApiManager {
     private static final Logger logger = LogManager.getLogger(GsaApiManager.class);
 
     private static final String OUTPUT_XML = "xml"; // or xml_no_dtd
     // http://www.google.com/google.dtd.
 
+    /**
+     * Constructs a new GsaApiManager with the default path prefix "/gsa".
+     */
     public GsaApiManager() {
         setPathPrefix("/gsa");
     }
 
+    /**
+     * Registers this API manager with the WebApiManagerFactory during application startup.
+     * This method is called automatically after dependency injection is complete.
+     */
     @PostConstruct
     public void register() {
         if (logger.isInfoEnabled()) {
@@ -105,10 +117,26 @@ public class GsaApiManager extends BaseApiManager {
         }
     }
 
+    /**
+     * Appends a parameter element to the XML response buffer with URL encoding.
+     *
+     * @param buf the StringBuilder to append to
+     * @param name the parameter name
+     * @param value the parameter value to be URL encoded
+     * @throws UnsupportedEncodingException if UTF-8 encoding is not supported
+     */
     protected void appendParam(final StringBuilder buf, final String name, final String value) throws UnsupportedEncodingException {
         appendParam(buf, name, value, URLEncoder.encode(value, Constants.UTF_8));
     }
 
+    /**
+     * Appends a parameter element to the XML response buffer with both encoded and original values.
+     *
+     * @param buf the StringBuilder to append to
+     * @param name the parameter name
+     * @param value the encoded parameter value
+     * @param original the original parameter value
+     */
     protected void appendParam(final StringBuilder buf, final String name, final String value, final String original) {
         buf.append("<PARAM name=\"");
         buf.append(escapeXml(name));
@@ -119,6 +147,14 @@ public class GsaApiManager extends BaseApiManager {
         buf.append("\"/>");
     }
 
+    /**
+     * Processes a GSA search request and generates an XML response.
+     * Handles parameter parsing, search execution, and result formatting.
+     *
+     * @param request the HTTP servlet request containing search parameters
+     * @param response the HTTP servlet response for the XML output
+     * @param chain the filter chain (not used in this implementation)
+     */
     protected void processSearchRequest(final HttpServletRequest request, final HttpServletResponse response, final FilterChain chain) {
         final SearchHelper searchHelper = ComponentUtil.getSearchHelper();
         final FessConfig fessConfig = ComponentUtil.getFessConfig();
@@ -357,6 +393,14 @@ public class GsaApiManager extends BaseApiManager {
         writeXmlResponse(status, xmlDtd, buf.toString(), errMsg);
     }
 
+    /**
+     * Writes an XML response in GSA format to the HTTP response.
+     *
+     * @param status the response status (0 for success, non-zero for error)
+     * @param xmlDtd whether to include the XML DTD declaration
+     * @param body the response body content
+     * @param errMsg error message to include if status is non-zero
+     */
     protected void writeXmlResponse(final int status, final boolean xmlDtd, final String body, final String errMsg) {
         final StringBuilder buf = new StringBuilder(1000);
         buf.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>");
@@ -378,6 +422,13 @@ public class GsaApiManager extends BaseApiManager {
 
     }
 
+    /**
+     * Escapes an object for safe inclusion in XML content.
+     * Handles various object types including Lists, Maps, Dates, and strings.
+     *
+     * @param obj the object to escape
+     * @return the XML-escaped string representation
+     */
     protected String escapeXml(final Object obj) {
         final StringBuilder buf = new StringBuilder(255);
         if (obj instanceof List<?>) {
@@ -443,6 +494,10 @@ public class GsaApiManager extends BaseApiManager {
         }
     }
 
+    /**
+     * Request parameters adapter that converts GSA-style parameters to Fess search parameters.
+     * Handles parameter mapping, sorting, pagination, and field filtering for GSA compatibility.
+     */
     protected static class GsaRequestParams extends SearchRequestParams {
 
         private final HttpServletRequest request;
@@ -457,6 +512,12 @@ public class GsaApiManager extends BaseApiManager {
 
         private String sortParam;
 
+        /**
+         * Constructs GSA request parameters from an HTTP request.
+         *
+         * @param request the HTTP servlet request containing GSA parameters
+         * @param fessConfig the Fess configuration for default values and mappings
+         */
         protected GsaRequestParams(final HttpServletRequest request, final FessConfig fessConfig) {
             this.request = request;
             this.fessConfig = fessConfig;
@@ -541,6 +602,11 @@ public class GsaApiManager extends BaseApiManager {
             return createFacetInfo(request);
         }
 
+        /**
+         * Gets the original sort parameter string from the request.
+         *
+         * @return the sort parameter value
+         */
         public String getSortParam() {
             return sortParam;
         }
