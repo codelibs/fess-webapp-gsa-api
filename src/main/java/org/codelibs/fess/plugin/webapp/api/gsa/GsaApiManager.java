@@ -75,10 +75,208 @@ public class GsaApiManager extends BaseApiManager {
     // http://www.google.com/google.dtd.
 
     /**
+     * GSA response parameter configuration with default values.
+     * These values can be overridden via FessConfig if corresponding methods exist.
+     */
+    protected static class GsaResponseParams {
+        /** Access level: p (public), s (secure), a (all) */
+        public static final String DEFAULT_ACCESS = "p";
+        /** Query expansion recursion level (0-10) */
+        public static final String DEFAULT_ENTQR = "3";
+        /** Query expansion return mode */
+        public static final String DEFAULT_ENTQRM = "0";
+        /** Word context size for snippets */
+        public static final String DEFAULT_WC = "200";
+        /** Word context max count */
+        public static final String DEFAULT_WC_MC = "1";
+        /** Whether to include spelling suggestions */
+        public static final boolean DEFAULT_INCLUDE_SPELLING = true;
+        /** Whether to include facet navigation */
+        public static final boolean DEFAULT_INCLUDE_FACETS = true;
+        /** Whether to include crawl date */
+        public static final boolean DEFAULT_INCLUDE_CRAWLDATE = true;
+        /** Whether to generate cache links */
+        public static final boolean DEFAULT_INCLUDE_CACHE_LINK = false;
+    }
+
+    /**
      * Constructs a new GsaApiManager with the default path prefix "/gsa".
      */
     public GsaApiManager() {
         setPathPrefix("/gsa");
+    }
+
+    /**
+     * Gets the access level parameter value from config or default.
+     *
+     * @param fessConfig the Fess configuration
+     * @return access level value (p, s, or a)
+     */
+    protected String getAccessParam(final FessConfig fessConfig) {
+        return getConfigValue(fessConfig, "getApiGsaResponseAccess", GsaResponseParams.DEFAULT_ACCESS);
+    }
+
+    /**
+     * Gets the query expansion recursion level from config or default.
+     *
+     * @param fessConfig the Fess configuration
+     * @return query expansion recursion level
+     */
+    protected String getEntqrParam(final FessConfig fessConfig) {
+        return getConfigValue(fessConfig, "getApiGsaResponseEntqr", GsaResponseParams.DEFAULT_ENTQR);
+    }
+
+    /**
+     * Gets the query expansion return mode from config or default.
+     *
+     * @param fessConfig the Fess configuration
+     * @return query expansion return mode
+     */
+    protected String getEntqrmParam(final FessConfig fessConfig) {
+        return getConfigValue(fessConfig, "getApiGsaResponseEntqrm", GsaResponseParams.DEFAULT_ENTQRM);
+    }
+
+    /**
+     * Gets the word context size from config or default.
+     *
+     * @param fessConfig the Fess configuration
+     * @return word context size
+     */
+    protected String getWcParam(final FessConfig fessConfig) {
+        return getConfigValue(fessConfig, "getApiGsaResponseWc", GsaResponseParams.DEFAULT_WC);
+    }
+
+    /**
+     * Gets the word context max count from config or default.
+     *
+     * @param fessConfig the Fess configuration
+     * @return word context max count
+     */
+    protected String getWcMcParam(final FessConfig fessConfig) {
+        return getConfigValue(fessConfig, "getApiGsaResponseWcMc", GsaResponseParams.DEFAULT_WC_MC);
+    }
+
+    /**
+     * Checks if spelling suggestions should be included in the response.
+     *
+     * @param fessConfig the Fess configuration
+     * @return true if spelling suggestions should be included
+     */
+    protected boolean isIncludeSpelling(final FessConfig fessConfig) {
+        return getBooleanConfigValue(fessConfig, "isApiGsaResponseIncludeSpelling", GsaResponseParams.DEFAULT_INCLUDE_SPELLING);
+    }
+
+    /**
+     * Checks if facet navigation should be included in the response.
+     *
+     * @param fessConfig the Fess configuration
+     * @return true if facets should be included
+     */
+    protected boolean isIncludeFacets(final FessConfig fessConfig) {
+        return getBooleanConfigValue(fessConfig, "isApiGsaResponseIncludeFacets", GsaResponseParams.DEFAULT_INCLUDE_FACETS);
+    }
+
+    /**
+     * Checks if crawl date should be included in the response.
+     *
+     * @param fessConfig the Fess configuration
+     * @return true if crawl date should be included
+     */
+    protected boolean isIncludeCrawldate(final FessConfig fessConfig) {
+        return getBooleanConfigValue(fessConfig, "isApiGsaResponseIncludeCrawldate", GsaResponseParams.DEFAULT_INCLUDE_CRAWLDATE);
+    }
+
+    /**
+     * Checks if cache links should be generated in the response.
+     *
+     * @param fessConfig the Fess configuration
+     * @return true if cache links should be generated
+     */
+    protected boolean isIncludeCacheLink(final FessConfig fessConfig) {
+        return getBooleanConfigValue(fessConfig, "isApiGsaResponseIncludeCacheLink", GsaResponseParams.DEFAULT_INCLUDE_CACHE_LINK);
+    }
+
+    /**
+     * Generates a cache link URL for a document.
+     *
+     * @param request the HTTP request
+     * @param docId the document ID
+     * @param fessConfig the Fess configuration
+     * @return the cache link URL, or empty string if not available
+     */
+    protected String generateCacheLink(final HttpServletRequest request, final String docId, final FessConfig fessConfig) {
+        if (!isIncludeCacheLink(fessConfig) || StringUtil.isBlank(docId)) {
+            return StringUtil.EMPTY;
+        }
+
+        try {
+            final StringBuilder cacheUrl = new StringBuilder();
+            // Build base URL from request
+            final String scheme = request.getScheme();
+            final String serverName = request.getServerName();
+            final int serverPort = request.getServerPort();
+
+            cacheUrl.append(scheme).append("://").append(serverName);
+            if ((scheme.equals("http") && serverPort != 80) || (scheme.equals("https") && serverPort != 443)) {
+                cacheUrl.append(":").append(serverPort);
+            }
+            cacheUrl.append(request.getContextPath());
+            cacheUrl.append("/cache?docId=");
+            cacheUrl.append(URLEncoder.encode(docId, Constants.UTF_8));
+
+            return cacheUrl.toString();
+        } catch (final Exception e) {
+            if (logger.isDebugEnabled()) {
+                logger.debug("Failed to generate cache link for docId: {}", docId, e);
+            }
+            return StringUtil.EMPTY;
+        }
+    }
+
+    /**
+     * Gets a configuration value from FessConfig using reflection, with fallback to default.
+     *
+     * @param fessConfig the Fess configuration
+     * @param methodName the method name to invoke
+     * @param defaultValue the default value if method doesn't exist or fails
+     * @return the configuration value or default
+     */
+    protected String getConfigValue(final FessConfig fessConfig, final String methodName, final String defaultValue) {
+        try {
+            final java.lang.reflect.Method method = fessConfig.getClass().getMethod(methodName);
+            final Object result = method.invoke(fessConfig);
+            if (result instanceof String) {
+                return (String) result;
+            }
+        } catch (final Exception e) {
+            if (logger.isDebugEnabled()) {
+                logger.debug("Config method {} not found, using default: {}", methodName, defaultValue);
+            }
+        }
+        return defaultValue;
+    }
+
+    /**
+     * Gets a boolean configuration value from FessConfig using reflection, with fallback to default.
+     *
+     * @param fessConfig the Fess configuration
+     * @param methodName the method name to invoke
+     * @param defaultValue the default value if method doesn't exist or fails
+     * @return the configuration value or default
+     */
+    protected boolean getBooleanConfigValue(final FessConfig fessConfig, final String methodName, final boolean defaultValue) {
+        try {
+            final java.lang.reflect.Method method = fessConfig.getClass().getMethod(methodName);
+            final Object result = method.invoke(fessConfig);
+            if (result instanceof Boolean) {
+                return (Boolean) result;
+            }
+        } catch (final Exception e) {
+            if (logger.isDebugEnabled()) {
+                logger.debug("Config method {} not found, using default: {}", methodName, defaultValue);
+            }
+        }
+        return defaultValue;
     }
 
     /**
@@ -114,6 +312,101 @@ public class GsaApiManager extends BaseApiManager {
         default:
             writeXmlResponse(99, false, StringUtil.EMPTY, "Not found.");
             break;
+        }
+    }
+
+    /**
+     * Appends spelling suggestions to the XML response if available.
+     *
+     * @param buf the StringBuilder to append to
+     * @param data the search render data containing suggestion info
+     * @param originalQuery the original search query
+     * @param fessConfig the Fess configuration
+     */
+    protected void appendSpellingSuggestion(final StringBuilder buf, final SearchRenderData data, final String originalQuery,
+            final FessConfig fessConfig) {
+        if (!isIncludeSpelling(fessConfig)) {
+            return;
+        }
+
+        try {
+            // Try to get spelling suggestion using reflection
+            final java.lang.reflect.Method method = data.getClass().getMethod("getSpellingSuggestion");
+            final Object suggestion = method.invoke(data);
+            if (suggestion != null && suggestion instanceof String) {
+                final String suggestedQuery = (String) suggestion;
+                if (StringUtil.isNotBlank(suggestedQuery) && !suggestedQuery.equals(originalQuery)) {
+                    buf.append("<Spelling>");
+                    buf.append("<Suggestion q=\"");
+                    buf.append(escapeXml(URLEncoder.encode(suggestedQuery, Constants.UTF_8)));
+                    buf.append("\">");
+                    buf.append(escapeXml(suggestedQuery));
+                    buf.append("</Suggestion>");
+                    buf.append("</Spelling>");
+                }
+            }
+        } catch (final Exception e) {
+            if (logger.isDebugEnabled()) {
+                logger.debug("Spelling suggestion not available: {}", e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Appends facet navigation information to the XML response if available.
+     *
+     * @param buf the StringBuilder to append to
+     * @param data the search render data containing facet info
+     * @param fessConfig the Fess configuration
+     */
+    protected void appendFacetNavigation(final StringBuilder buf, final SearchRenderData data, final FessConfig fessConfig) {
+        if (!isIncludeFacets(fessConfig)) {
+            return;
+        }
+
+        try {
+            // Try to get facet information using reflection
+            final java.lang.reflect.Method method = data.getClass().getMethod("getFacetResponse");
+            final Object facetResponse = method.invoke(data);
+            if (facetResponse != null && facetResponse instanceof Map) {
+                @SuppressWarnings("unchecked")
+                final Map<String, ?> facetMap = (Map<String, ?>) facetResponse;
+                if (!facetMap.isEmpty()) {
+                    buf.append("<Context>");
+                    for (final Map.Entry<String, ?> entry : facetMap.entrySet()) {
+                        final String facetName = entry.getKey();
+                        final Object facetValues = entry.getValue();
+                        if (facetValues instanceof List) {
+                            @SuppressWarnings("unchecked")
+                            final List<Map<String, Object>> valueList = (List<Map<String, Object>>) facetValues;
+                            if (!valueList.isEmpty()) {
+                                buf.append("<Facet>");
+                                buf.append("<FacetItem>");
+                                buf.append("<label>").append(escapeXml(facetName)).append("</label>");
+                                for (final Map<String, Object> facetItem : valueList) {
+                                    final Object label = facetItem.get("value");
+                                    final Object count = facetItem.get("count");
+                                    if (label != null && count != null) {
+                                        buf.append("<anchor_text>");
+                                        buf.append(escapeXml(label));
+                                        buf.append(" (");
+                                        buf.append(count);
+                                        buf.append(")");
+                                        buf.append("</anchor_text>");
+                                    }
+                                }
+                                buf.append("</FacetItem>");
+                                buf.append("</Facet>");
+                            }
+                        }
+                    }
+                    buf.append("</Context>");
+                }
+            }
+        } catch (final Exception e) {
+            if (logger.isDebugEnabled()) {
+                logger.debug("Facet information not available: {}", e.getMessage());
+            }
         }
     }
 
@@ -202,6 +495,8 @@ public class GsaApiManager extends BaseApiManager {
             buf.append("<Q>");
             buf.append(escapeXml(query));
             buf.append("</Q>");
+            // Add spelling suggestion after Q element
+            appendSpellingSuggestion(buf, data, query, fessConfig);
             for (final Entry<String, String[]> entry : request.getParameterMap().entrySet()) {
                 final String[] values = entry.getValue();
                 if (values == null) {
@@ -225,12 +520,12 @@ public class GsaApiManager extends BaseApiManager {
                 appendParam(buf, "ulang", langs[0]);
             }
             appendParam(buf, "ip", ip);
-            appendParam(buf, "access", "p");
+            appendParam(buf, "access", getAccessParam(fessConfig));
             appendParam(buf, "sort", params.getSortParam(), params.getSortParam());
-            appendParam(buf, "entqr", "3");
-            appendParam(buf, "entqrm", "0");
-            appendParam(buf, "wc", "200");
-            appendParam(buf, "wc_mc", "1");
+            appendParam(buf, "entqr", getEntqrParam(fessConfig));
+            appendParam(buf, "entqrm", getEntqrmParam(fessConfig));
+            appendParam(buf, "wc", getWcParam(fessConfig));
+            appendParam(buf, "wc_mc", getWcMcParam(fessConfig));
             if (!documentItems.isEmpty()) {
                 buf.append("<RES SN=\"");
                 buf.append(data.getCurrentStartRecordNumber());
@@ -313,20 +608,33 @@ public class GsaApiManager extends BaseApiManager {
                     }
                     buf.append("<ENT_SOURCE>").append(escapeXml("FESS")).append("</ENT_SOURCE>");
                     String lastModified = DocumentUtil.getValue(document, fessConfig.getIndexFieldLastModified(), String.class);
-                    if (StringUtil.isBlank(lastModified)) {
-                        lastModified = StringUtil.EMPTY;
+                    String lastModifiedDate = StringUtil.EMPTY;
+                    if (StringUtil.isNotBlank(lastModified)) {
+                        lastModifiedDate = lastModified.split("T")[0];
                     }
-                    lastModified = lastModified.split("T")[0];
-                    buf.append("<FS NAME=\"date\" VALUE=\"").append(escapeXml(lastModified)).append("\"/>");
+                    // Include CRAWLDATE if configured (GSA standard element)
+                    if (isIncludeCrawldate(fessConfig) && StringUtil.isNotBlank(lastModifiedDate)) {
+                        buf.append("<CRAWLDATE>").append(escapeXml(lastModifiedDate)).append("</CRAWLDATE>");
+                    }
+                    buf.append("<FS NAME=\"date\" VALUE=\"").append(escapeXml(lastModifiedDate)).append("\"/>");
 
                     buf.append("<HAS>");
-                    buf.append("<L/>");
+                    // Generate cache link if configured
+                    final String docId = DocumentUtil.getValue(document, fessConfig.getIndexFieldDocId(), String.class);
+                    final String cacheLink = generateCacheLink(request, docId, fessConfig);
+                    if (StringUtil.isNotBlank(cacheLink)) {
+                        buf.append("<L>");
+                        buf.append(escapeXml(cacheLink));
+                        buf.append("</L>");
+                    } else {
+                        buf.append("<L/>");
+                    }
                     buf.append("<C SZ=\"");
                     buf.append(DocumentUtil.getValue(document, fessConfig.getIndexFieldContentLength(), Long.class, (long) 0).longValue()
                             / 1000);
                     document.remove(fessConfig.getIndexFieldContentLength());
                     buf.append("k\" CID=\"");
-                    buf.append(DocumentUtil.getValue(document, fessConfig.getIndexFieldDocId(), String.class));
+                    buf.append(docId);
                     document.remove(fessConfig.getIndexFieldDocId());
                     buf.append("\" ENC=\"");
                     final String charsetField = fessConfig.getQueryGsaIndexFieldCharset();
@@ -354,6 +662,8 @@ public class GsaApiManager extends BaseApiManager {
                 }
                 buf.append("</RES>");
             }
+            // Add facet navigation after RES element
+            appendFacetNavigation(buf, data, fessConfig);
         } catch (final Exception e) {
             status = 1;
             final Supplier<String> stacktraceString = () -> {
@@ -576,6 +886,11 @@ public class GsaApiManager extends BaseApiManager {
                     final String[] value = simplifyArray(entry.getValue());
                     conditions.put(key.substring("as_".length()), value);
                 }
+            }
+            // Handle filter parameter for duplicate filtering (0=include duplicates, 1=exclude duplicates)
+            final String filter = request.getParameter("filter");
+            if (StringUtil.isNotBlank(filter)) {
+                conditions.put("filter", new String[] { filter });
             }
             return conditions;
         }

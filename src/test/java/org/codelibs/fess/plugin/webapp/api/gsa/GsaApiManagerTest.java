@@ -877,4 +877,128 @@ public class GsaApiManagerTest extends LastaFluteTestCase {
         assertNull(wrappedRequest.getParameter("nonExistent"));
         assertNull(wrappedRequest.getParameterValues("nonExistent"));
     }
+
+    // Tests for new filter parameter support
+    public void test_gsaRequestParams_filterParameter() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("filter", "1");
+        request.setParameter("as_q", "search term");
+
+        FessConfig fessConfig = new TestFessConfig();
+
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        GsaApiManager.GsaRequestParams params = new GsaApiManager.GsaRequestParams(request, fessConfig);
+
+        Map<String, String[]> conditions = params.getConditions();
+
+        assertTrue(conditions.containsKey("filter"));
+        assertEquals("1", conditions.get("filter")[0]);
+        assertTrue(conditions.containsKey("q"));
+    }
+
+    public void test_gsaRequestParams_filterParameterNotSet() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("as_q", "search term");
+
+        FessConfig fessConfig = new TestFessConfig();
+
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        GsaApiManager.GsaRequestParams params = new GsaApiManager.GsaRequestParams(request, fessConfig);
+
+        Map<String, String[]> conditions = params.getConditions();
+
+        assertFalse(conditions.containsKey("filter"));
+    }
+
+    // Tests for new configuration methods
+    public void test_getAccessParam_default() {
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        FessConfig fessConfig = new TestFessConfig();
+
+        String access = gsaApiManager.getAccessParam(fessConfig);
+
+        assertEquals("p", access);
+    }
+
+    public void test_getEntqrParam_default() {
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        FessConfig fessConfig = new TestFessConfig();
+
+        String entqr = gsaApiManager.getEntqrParam(fessConfig);
+
+        assertEquals("3", entqr);
+    }
+
+    public void test_getWcParam_default() {
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        FessConfig fessConfig = new TestFessConfig();
+
+        String wc = gsaApiManager.getWcParam(fessConfig);
+
+        assertEquals("200", wc);
+    }
+
+    public void test_isIncludeSpelling_default() {
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        FessConfig fessConfig = new TestFessConfig();
+
+        boolean includeSpelling = gsaApiManager.isIncludeSpelling(fessConfig);
+
+        assertTrue(includeSpelling);
+    }
+
+    public void test_isIncludeFacets_default() {
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        FessConfig fessConfig = new TestFessConfig();
+
+        boolean includeFacets = gsaApiManager.isIncludeFacets(fessConfig);
+
+        assertTrue(includeFacets);
+    }
+
+    public void test_isIncludeCrawldate_default() {
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        FessConfig fessConfig = new TestFessConfig();
+
+        boolean includeCrawldate = gsaApiManager.isIncludeCrawldate(fessConfig);
+
+        assertTrue(includeCrawldate);
+    }
+
+    public void test_isIncludeCacheLink_default() {
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        FessConfig fessConfig = new TestFessConfig();
+
+        boolean includeCacheLink = gsaApiManager.isIncludeCacheLink(fessConfig);
+
+        // Default is false to maintain backward compatibility
+        assertFalse(includeCacheLink);
+    }
+
+    public void test_generateCacheLink_disabled() {
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        FessConfig fessConfig = new TestFessConfig();
+        MockletHttpServletRequest request = mockServletContext.createRequest("/gsa/search");
+
+        String cacheLink = gsaApiManager.generateCacheLink(request, "doc123", fessConfig);
+
+        // Should return empty string when cache link is disabled
+        assertEquals("", cacheLink);
+    }
+
+    public void test_generateCacheLink_nullDocId() {
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        FessConfig fessConfig = new TestFessConfig() {
+            @Override
+            public boolean isApiGsaResponseIncludeCacheLink() {
+                return true;
+            }
+        };
+        MockletHttpServletRequest request = mockServletContext.createRequest("/gsa/search");
+
+        String cacheLink = gsaApiManager.generateCacheLink(request, null, fessConfig);
+
+        // Should return empty string for null docId
+        assertEquals("", cacheLink);
+    }
 }
