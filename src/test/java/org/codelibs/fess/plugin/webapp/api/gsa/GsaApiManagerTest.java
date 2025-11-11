@@ -452,4 +452,429 @@ public class GsaApiManagerTest extends LastaFluteTestCase {
 
         assertEquals("true", params.getTrackTotalHits());
     }
+
+    // Additional tests for GsaRequestParams methods
+
+    public void test_gsaRequestParams_getAttribute() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setAttribute("testAttr", "testValue");
+
+        FessConfig fessConfig = new TestFessConfig();
+
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        GsaApiManager.GsaRequestParams params = new GsaApiManager.GsaRequestParams(request, fessConfig);
+
+        assertEquals("testValue", params.getAttribute("testAttr"));
+        assertNull(params.getAttribute("nonExistentAttr"));
+    }
+
+    public void test_gsaRequestParams_locale() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+
+        FessConfig fessConfig = new TestFessConfig();
+
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        GsaApiManager.GsaRequestParams params = new GsaApiManager.GsaRequestParams(request, fessConfig);
+
+        assertEquals(java.util.Locale.ROOT, params.getLocale());
+    }
+
+    public void test_gsaRequestParams_type() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+
+        FessConfig fessConfig = new TestFessConfig();
+
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        GsaApiManager.GsaRequestParams params = new GsaApiManager.GsaRequestParams(request, fessConfig);
+
+        assertEquals(org.codelibs.fess.entity.SearchRequestParams.SearchRequestType.GSA, params.getType());
+    }
+
+    // Note: getGeoInfo(), getFacetInfo(), and getHighlightInfo() tests are skipped
+    // because they depend on external components (viewHelper, properties) that are
+    // not available in unit test environment. These methods are tested through
+    // integration tests.
+
+    // Edge case tests
+
+    public void test_gsaRequestParams_pageSizeZero() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("num", "0");
+
+        FessConfig fessConfig = new TestFessConfig();
+
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        GsaApiManager.GsaRequestParams params = new GsaApiManager.GsaRequestParams(request, fessConfig);
+
+        // Should fallback to max size for zero or negative values (line 688-689)
+        assertEquals(100, params.getPageSize());
+    }
+
+    public void test_gsaRequestParams_pageSizeNegative() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("num", "-5");
+
+        FessConfig fessConfig = new TestFessConfig();
+
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        GsaApiManager.GsaRequestParams params = new GsaApiManager.GsaRequestParams(request, fessConfig);
+
+        // Should fallback to max size for negative values (line 688-689)
+        assertEquals(100, params.getPageSize());
+    }
+
+    public void test_gsaRequestParams_sortEmpty() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("sort", "");
+
+        FessConfig fessConfig = new TestFessConfig();
+
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        GsaApiManager.GsaRequestParams params = new GsaApiManager.GsaRequestParams(request, fessConfig);
+
+        // Empty sort should return null
+        assertNull(params.getSort());
+    }
+
+    public void test_gsaRequestParams_sortInvalidFormat() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("sort", "invalid:format:test");
+
+        FessConfig fessConfig = new TestFessConfig();
+
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        GsaApiManager.GsaRequestParams params = new GsaApiManager.GsaRequestParams(request, fessConfig);
+
+        // Invalid format should return null and clear sortParam
+        assertNull(params.getSort());
+        assertEquals("", params.getSortParam());
+    }
+
+    public void test_gsaRequestParams_sortDateDescending() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("sort", "date:D");
+
+        FessConfig fessConfig = new TestFessConfig();
+
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        GsaApiManager.GsaRequestParams params = new GsaApiManager.GsaRequestParams(request, fessConfig);
+
+        String sortResult = params.getSort();
+        assertTrue(sortResult.contains("timestamp.desc"));
+        assertTrue(sortResult.contains("score.desc"));
+    }
+
+    public void test_gsaRequestParams_sortMetaAscending() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("sort", "meta:author:A");
+
+        FessConfig fessConfig = new TestFessConfig();
+
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        GsaApiManager.GsaRequestParams params = new GsaApiManager.GsaRequestParams(request, fessConfig);
+
+        String sortResult = params.getSort();
+        assertTrue(sortResult.contains("meta_author.asc"));
+        assertTrue(sortResult.contains("score.desc"));
+    }
+
+    public void test_gsaRequestParams_sortMetaNoDirection() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("sort", "meta:title");
+
+        FessConfig fessConfig = new TestFessConfig();
+
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        GsaApiManager.GsaRequestParams params = new GsaApiManager.GsaRequestParams(request, fessConfig);
+
+        String sortResult = params.getSort();
+        assertTrue(sortResult.contains("meta_title"));
+        assertTrue(sortResult.contains("score.desc"));
+    }
+
+    public void test_gsaRequestParams_multipleExtraQueries() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("ex_q", new String[] {"query1", "query2", "query3"});
+
+        FessConfig fessConfig = new TestFessConfig();
+
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        GsaApiManager.GsaRequestParams params = new GsaApiManager.GsaRequestParams(request, fessConfig);
+
+        String[] extraQueries = params.getExtraQueries();
+
+        assertTrue(extraQueries.length >= 3);
+        assertEquals("query1", extraQueries[0]);
+        assertEquals("query2", extraQueries[1]);
+        assertEquals("query3", extraQueries[2]);
+    }
+
+    public void test_gsaRequestParams_requiredFieldsWithOr() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("requiredfields", "title|author|date");
+
+        FessConfig fessConfig = new TestFessConfig();
+
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        GsaApiManager.GsaRequestParams params = new GsaApiManager.GsaRequestParams(request, fessConfig);
+
+        String[] extraQueries = params.getExtraQueries();
+
+        // Should contain OR clauses
+        boolean foundOrQuery = false;
+        for (String query : extraQueries) {
+            if (query.contains("OR")) {
+                foundOrQuery = true;
+                break;
+            }
+        }
+        assertTrue(foundOrQuery);
+    }
+
+    public void test_gsaRequestParams_fieldsAndSite() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("fields.label", "oldLabel");
+        request.setParameter("site", "newSite");
+
+        FessConfig fessConfig = new TestFessConfig();
+
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        GsaApiManager.GsaRequestParams params = new GsaApiManager.GsaRequestParams(request, fessConfig);
+
+        Map<String, String[]> fields = params.getFields();
+
+        // site parameter should override fields.label
+        assertTrue(fields.containsKey("label"));
+        String[] labelValues = fields.get("label");
+        boolean hasNewSite = false;
+        for (String value : labelValues) {
+            if ("newSite".equals(value)) {
+                hasNewSite = true;
+                break;
+            }
+        }
+        assertTrue(hasNewSite);
+    }
+
+    public void test_gsaRequestParams_conditionsMultiple() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("as_sitesearch", "example.com");
+        request.setParameter("as_filetype", "pdf");
+        request.setParameter("as_q", "search term");
+        request.setParameter("as_epq", "exact phrase");
+
+        FessConfig fessConfig = new TestFessConfig();
+
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        GsaApiManager.GsaRequestParams params = new GsaApiManager.GsaRequestParams(request, fessConfig);
+
+        Map<String, String[]> conditions = params.getConditions();
+
+        assertEquals(4, conditions.size());
+        assertTrue(conditions.containsKey("sitesearch"));
+        assertTrue(conditions.containsKey("filetype"));
+        assertTrue(conditions.containsKey("q"));
+        assertTrue(conditions.containsKey("epq"));
+    }
+
+    // Tests for escapeXml edge cases
+
+    public void test_escapeXml_emptyList() {
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+
+        List<String> emptyList = Collections.emptyList();
+        String result = gsaApiManager.escapeXml(emptyList);
+
+        assertEquals("<list></list>", result);
+    }
+
+    public void test_escapeXml_emptyMap() {
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+
+        Map<String, String> emptyMap = Collections.emptyMap();
+        String result = gsaApiManager.escapeXml(emptyMap);
+
+        assertEquals("<data></data>", result);
+    }
+
+    public void test_escapeXml_nestedList() {
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+
+        List<Object> innerList = Arrays.asList("inner1", "inner2");
+        List<Object> outerList = Arrays.asList("outer", innerList);
+        String result = gsaApiManager.escapeXml(outerList);
+
+        assertTrue(result.contains("<list>"));
+        assertTrue(result.contains("<item>outer</item>"));
+        assertTrue(result.contains("<item><list>"));
+        assertTrue(result.contains("<item>inner1</item>"));
+        assertTrue(result.contains("<item>inner2</item>"));
+    }
+
+    public void test_escapeXml_nestedMap() {
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+
+        Map<String, Object> innerMap = new HashMap<>();
+        innerMap.put("innerKey", "innerValue");
+
+        Map<String, Object> outerMap = new HashMap<>();
+        outerMap.put("outerKey", "outerValue");
+        outerMap.put("nestedMap", innerMap);
+
+        String result = gsaApiManager.escapeXml(outerMap);
+
+        assertTrue(result.contains("<data>"));
+        assertTrue(result.contains("<name>outerKey</name><value>outerValue</value>"));
+        assertTrue(result.contains("<name>nestedMap</name><value><data>"));
+        assertTrue(result.contains("<name>innerKey</name><value>innerValue</value>"));
+    }
+
+    public void test_escapeXml_specialCharacters() {
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+
+        String specialChars = "<>&\"'";
+        String result = gsaApiManager.escapeXml(specialChars);
+
+        assertTrue(result.contains("&lt;"));
+        assertTrue(result.contains("&gt;"));
+        assertTrue(result.contains("&amp;"));
+        assertTrue(result.contains("&quot;"));
+    }
+
+    public void test_appendParam_withSpecialCharacters() throws UnsupportedEncodingException {
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        StringBuilder buf = new StringBuilder();
+
+        gsaApiManager.appendParam(buf, "param&name", "<value>");
+
+        String result = buf.toString();
+        assertTrue(result.contains("&amp;"));
+        assertTrue(result.contains("&lt;"));
+        assertTrue(result.contains("&gt;"));
+    }
+
+    public void test_appendParam_withEmptyValue() throws UnsupportedEncodingException {
+        GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        StringBuilder buf = new StringBuilder();
+
+        gsaApiManager.appendParam(buf, "emptyParam", "");
+
+        String result = buf.toString();
+        assertTrue(result.contains("<PARAM name=\"emptyParam\""));
+        assertTrue(result.contains("value=\"\""));
+        assertTrue(result.contains("original_value=\"\""));
+    }
+
+    // Tests for WrappedWebApiRequest
+
+    public void test_wrappedWebApiRequest_getParameter() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("originalParam", "originalValue");
+
+        Map<String, String[]> extraParams = new HashMap<>();
+        extraParams.put("extraParam", new String[] {"extraValue"});
+        extraParams.put("originalParam", new String[] {"overriddenValue"});
+
+        GsaApiManager.WrappedWebApiRequest wrappedRequest =
+            new GsaApiManager.WrappedWebApiRequest(request, "/test", extraParams);
+
+        // Extra parameter should be accessible
+        assertEquals("extraValue", wrappedRequest.getParameter("extraParam"));
+
+        // Original parameter should be overridden by extra parameter
+        assertEquals("overriddenValue", wrappedRequest.getParameter("originalParam"));
+    }
+
+    public void test_wrappedWebApiRequest_getParameterMap() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("param1", "value1");
+
+        Map<String, String[]> extraParams = new HashMap<>();
+        extraParams.put("param2", new String[] {"value2"});
+
+        GsaApiManager.WrappedWebApiRequest wrappedRequest =
+            new GsaApiManager.WrappedWebApiRequest(request, "/test", extraParams);
+
+        Map<String, String[]> paramMap = wrappedRequest.getParameterMap();
+
+        assertTrue(paramMap.containsKey("param1"));
+        assertTrue(paramMap.containsKey("param2"));
+        assertEquals("value1", paramMap.get("param1")[0]);
+        assertEquals("value2", paramMap.get("param2")[0]);
+
+        // The map should be unmodifiable
+        try {
+            paramMap.put("newParam", new String[] {"newValue"});
+            fail("Expected UnsupportedOperationException");
+        } catch (UnsupportedOperationException e) {
+            // Expected
+        }
+    }
+
+    public void test_wrappedWebApiRequest_getParameterNames() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("param1", "value1");
+
+        Map<String, String[]> extraParams = new HashMap<>();
+        extraParams.put("param2", new String[] {"value2"});
+
+        GsaApiManager.WrappedWebApiRequest wrappedRequest =
+            new GsaApiManager.WrappedWebApiRequest(request, "/test", extraParams);
+
+        java.util.Enumeration<String> paramNames = wrappedRequest.getParameterNames();
+
+        List<String> namesList = Collections.list(paramNames);
+        assertTrue(namesList.contains("param1"));
+        assertTrue(namesList.contains("param2"));
+    }
+
+    public void test_wrappedWebApiRequest_getParameterValues() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("multiParam", new String[] {"value1", "value2"});
+
+        Map<String, String[]> extraParams = new HashMap<>();
+        extraParams.put("extraMultiParam", new String[] {"extra1", "extra2", "extra3"});
+
+        GsaApiManager.WrappedWebApiRequest wrappedRequest =
+            new GsaApiManager.WrappedWebApiRequest(request, "/test", extraParams);
+
+        String[] values = wrappedRequest.getParameterValues("multiParam");
+        assertNotNull(values);
+        assertEquals(2, values.length);
+
+        String[] extraValues = wrappedRequest.getParameterValues("extraMultiParam");
+        assertNotNull(extraValues);
+        assertEquals(3, extraValues.length);
+    }
+
+    public void test_wrappedWebApiRequest_parameterOverride() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+        request.setParameter("overrideParam", "originalValue");
+
+        Map<String, String[]> extraParams = new HashMap<>();
+        extraParams.put("overrideParam", new String[] {"newValue"});
+
+        GsaApiManager.WrappedWebApiRequest wrappedRequest =
+            new GsaApiManager.WrappedWebApiRequest(request, "/test", extraParams);
+
+        // Extra parameter should override original
+        assertEquals("newValue", wrappedRequest.getParameter("overrideParam"));
+
+        String[] values = wrappedRequest.getParameterValues("overrideParam");
+        assertEquals(1, values.length);
+        assertEquals("newValue", values[0]);
+    }
+
+    public void test_wrappedWebApiRequest_nullParameter() {
+        MockletHttpServletRequest request = mockServletContext.createRequest("/");
+
+        Map<String, String[]> extraParams = new HashMap<>();
+
+        GsaApiManager.WrappedWebApiRequest wrappedRequest =
+            new GsaApiManager.WrappedWebApiRequest(request, "/test", extraParams);
+
+        // Non-existent parameter should return null
+        assertNull(wrappedRequest.getParameter("nonExistent"));
+        assertNull(wrappedRequest.getParameterValues("nonExistent"));
+    }
 }
