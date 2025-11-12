@@ -988,8 +988,8 @@ public class GsaApiManagerTest extends LastaFluteTestCase {
 
     public void test_generateCacheLink_nullDocId() {
         GsaApiManager gsaApiManager = getComponent("gsaApiManager");
+        // Note: isApiGsaResponseIncludeCacheLink() is a new method, not an override
         FessConfig fessConfig = new TestFessConfig() {
-            @Override
             public boolean isApiGsaResponseIncludeCacheLink() {
                 return true;
             }
