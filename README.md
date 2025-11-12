@@ -143,12 +143,3 @@ api.gsa.response.include_cache_link=false
   </Context>
 </GSP>
 ```
-
-## Backward Compatibility
-
-All changes maintain backward compatibility:
-- Previously hardcoded values now use configurable defaults
-- New features (spelling, facets, CRAWLDATE) are enabled by default
-- Cache links are disabled by default to maintain existing behavior
-- Existing tests continue to pass without modification
-
